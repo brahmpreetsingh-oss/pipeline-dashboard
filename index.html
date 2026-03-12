@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline by Geography | Axelerant</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;padding:24px}
+.header{margin-bottom:24px}
+.header h1{font-size:28px;font-weight:700;color:#f8fafc}
+.header p{color:#94a3b8;font-size:14px;margin-top:4px}
+.filters{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.filters button{padding:6px 16px;border-radius:20px;border:none;cursor:pointer;font-size:13px;font-weight:500;background:#1e293b;color:#94a3b8;transition:all .2s}
+.filters button.active{background:#6366f1;color:#fff}
+.filters button:hover{opacity:.85}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:24px}
+.kpi{background:#1e293b;border-radius:12px;padding:16px;border-left:4px solid #6366f1}
+.kpi.us{background:rgba(59,130,246,.12);border-left-color:#3b82f6}
+.kpi.uk{background:rgba(6,182,212,.12);border-left-color:#06b6d4}
+.kpi.row{background:rgba(245,158,11,.12);border-left-color:#f59e0b}
+.kpi-label{font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px}
+.kpi-value{font-size:28px;font-weight:700;color:#f8fafc}
+.kpi.us .kpi-value{color:#3b82f6}.kpi.uk .kpi-value{color:#06b6d4}.kpi.row .kpi-value{color:#f59e0b}
+.kpi-sub{font-size:13px;color:#94a3b8;margin-top:2px}
+.charts-row{display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:24px}
+@media(max-width:768px){.charts-row{grid-template-columns:1fr}}
+.card{background:#1e293b;border-radius:12px;padding:16px}
+.card h3{font-size:14px;color:#94a3b8;margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.funnel-row{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.funnel-label{width:160px;font-size:12px;color:#94a3b8;text-align:right;flex-shrink:0}
+.funnel-bar{flex:1;height:28px;border-radius:6px;display:flex;overflow:hidden;min-width:40px;transition:width .5s}
+.funnel-val{width:100px;font-size:12px;color:#cbd5e1;flex-shrink:0}
+.legend{display:flex;gap:16px;margin-top:12px;justify-content:center}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8}
+.legend-dot{width:10px;height:10px;border-radius:2px}
+.table-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.search{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px 12px;color:#e2e8f0;font-size:13px;width:220px;outline:none}
+.search:focus{border-color:#6366f1}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 10px;color:#94a3b8;font-weight:600;cursor:pointer;white-space:nowrap;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #334155;user-select:none}
+th.right{text-align:right}
+td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.03)}
+tr:nth-child(even){background:rgba(255,255,255,.02)}
+.deal-name{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#f1f5f9}
+.amount{text-align:right;font-weight:600;color:#f8fafc;font-variant-numeric:tabular-nums}
+.geo-badge{padding:2px 10px;border-radius:10px;font-size:11px;color:#fff;font-weight:600;display:inline-block}
+.geo-badge.us{background:#3b82f6}.geo-badge.uk{background:#06b6d4}.geo-badge.row{background:#f59e0b}
+.pipe-badge{background:#334155;padding:2px 8px;border-radius:10px;font-size:11px;color:#94a3b8;display:inline-block}
+.prob-bar{display:flex;align-items:center;gap:6px;justify-content:flex-end}
+.prob-track{width:40px;height:4px;background:#334155;border-radius:2px;overflow:hidden}
+.prob-fill{height:100%;border-radius:2px}
+.prob-text{font-size:11px;color:#94a3b8;width:30px;text-align:right}
+.footer{text-align:center;margin-top:24px;color:#475569;font-size:12px}
+.sort-icon{font-size:10px;opacity:.3}.sort-icon.active{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Pipeline by Geography</h1>
+  <p>HubSpot Sales Pipeline | Last refreshed: <span id="refreshDate">March 12, 2026</span></p>
+</div>
+
+<div class="filters" id="filters"></div>
+<div class="kpi-grid" id="kpis"></div>
+<div class="charts-row">
+  <div class="card"><h3>Geo Split</h3><canvas id="pieChart"></canvas></div>
+  <div class="card"><h3>Pipeline Type × Geo</h3><canvas id="barChart"></canvas></div>
+</div>
+<div class="card" style="margin-bottom:24px"><h3>Deal Stage Funnel</h3><div id="funnel"></div>
+  <div class="legend"><div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>US</div><div class="legend-item"><div class="legend-dot" style="background:#06b6d4"></div>UK</div><div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>ROW</div></div>
+</div>
+<div class="card" style="overflow:auto">
+  <div class="table-header">
+    <h3 style="margin:0" id="tableTitle">Deal Table</h3>
+    <input class="search" id="search" placeholder="Search deals...">
+  </div>
+  <table><thead><tr id="tableHead"></tr></thead><tbody id="tableBody"></tbody></table>
+  <p id="showMore" style="color:#64748b;font-size:12px;margin-top:8px;text-align:center;display:none"></p>
+</div>
+<div class="footer">Data sourced from HubSpot CRM | Geo mapped via company association + domain inference | Auto-refreshes every Wednesday at 5 PM</div>
+
+<script>
+const DEALS=[{"name":"PADI - Product engineering support","amount":540000,"stage":"Decision Maker Bought-In","pipeline":"Digital Existing New","geo":"US","probability":0.8,"closedate":"2026-06-30"},{"name":"PADI - Salesforce Multi-Cloud","amount":450000,"stage":"Decision Maker Bought-In","pipeline":"Digital Net New","geo":"US","probability":0.8,"closedate":"2026-02-10"},{"name":"Perrigo - Multi site Acquia","amount":350000,"stage":"Qualified To Buy","pipeline":"Digital Net New","geo":"US","probability":0.4,"closedate":"2026-05-04"},{"name":"Ironman - Intranet Hybrid","amount":242375,"stage":"Proposal Sent","pipeline":"Digital Existing New","geo":"US","probability":0.6,"closedate":"2026-04-30"},{"name":"UEL - Digital solutions 2026-27","amount":231000,"stage":"Potential","pipeline":"Digital Existing Expand","geo":"UK","probability":0.2,"closedate":"2026-04-30"},{"name":"RAK Ceramics - Online Store","amount":200000,"stage":"Proposal Sent","pipeline":"Digital Net New","geo":"ROW","probability":0.6,"closedate":"2026-03-31"},{"name":"Regents University - Digital overhaul","amount":197622,"stage":"Decision Maker Bought-In","pipeline":"Digital Existing Expand","geo":"UK","probability":0.8,"closedate":"2026-03-31"},{"name":"MDA - Website redesign","amount":160000,"stage":"Proposal Sent","pipeline":"Digital Net New","geo":"US","probability":0.6,"closedate":"2026-02-27"},{"name":"Blue State - MSF Drupal Support","amount":150000,"stage":"Potential","pipeline":"Digital Existing Expand","geo":"US","probability":0.2,"closedate":"2027-01-29"},{"name":"Icreon - Northmarq Drupal","amount":150000,"stage":"Potential","pipeline":"Digital Net New","geo":"US","probability":0.2,"closedate":"2026-02-28"},{"name":"NASWA - Website redesign","amount":150000,"stage":"Proposal Sent","pipeline":"Digital Net New","geo":"US","probability":0.6,"closedate":"2026-04-15"},{"name":"Dubai Holding - Nakheel revamp","amount":149000,"stage":"Proposal Sent","pipeline":"Digital Net New","geo":"ROW","probability":0.6,"closedate":"2026-03-31"},{"name":"PADI - Commercetools","amount":110000,"stage":"Qualified To Buy","pipeline":"Digital Existing New","geo":"US","probability":0.4,"closedate":"2026-04-01"},{"name":"AMA - Code of Medical Ethics","amount":75000,"stage":"Contract Sent","pipeline":"Digital Existing Expand","geo":"US","probability":0.9,"closedate":"2026-03-31"},{"name":"DX-ROI - Drupal redesign","amount":60480,"stage":"Potential","pipeline":"Digital Net New","geo":"US","probability":0.2,"closedate":"2026-01-30"},{"name":"IronMan - HubSpot CMS consolidation","amount":60000,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.2,"closedate":"2026-03-31"},{"name":"Acquia FY Q4 Blanket","amount":58000,"stage":"Potential","pipeline":"Digital Existing Expand","geo":"US","probability":0.2,"closedate":"2026-03-31"},{"name":"Bernadette - Allwyn revamp","amount":55000,"stage":"Potential","pipeline":"Digital Existing New","geo":"UK","probability":0.2,"closedate":"2026-03-06"},{"name":"Race Forward Migration Phase 2","amount":55000,"stage":"Hypothetical","pipeline":"Digital Existing New","geo":"US","probability":0.01,"closedate":"2026-04-30"},{"name":"Newicon - QA Partnership","amount":50000,"stage":"Qualified To Buy","pipeline":"Digital Net New","geo":"UK","probability":0.4,"closedate":"2026-01-31"},{"name":"Advance Velocity - ARInsights","amount":50000,"stage":"Potential","pipeline":"Digital Existing New","geo":"US","probability":0.2,"closedate":"2026-03-31"},{"name":"iFoundries - Mautic websites","amount":50000,"stage":"Potential","pipeline":"Digital Net New","geo":"ROW","probability":0.2,"closedate":"2026-01-01"},{"name":"Ironman - inventory consolidation","amount":50000,"stage":"Potential","pipeline":"Digital Existing New","geo":"US","probability":0.2,"closedate":"2026-04-30"},{"name":"AV - UltraViolet Cedar-Jira","amount":49500,"stage":"Contract Sent","pipeline":"Digital Existing New","geo":"US","probability":0.9,"closedate":"2026-03-31"},{"name":"ESC - Support & Maintenance","amount":46200,"stage":"Contract Sent","pipeline":"Digital Existing Expand","geo":"US","probability":0.9,"closedate":"2026-01-30"},{"name":"AV - NIL-Live Mobile App","amount":40000,"stage":"Hypothetical","pipeline":"Digital Existing New","geo":"US","probability":0.01,"closedate":"2026-06-30"},{"name":"Ironman - Runaway Series","amount":38510,"stage":"Proposal Sent","pipeline":"Digital Existing New","geo":"US","probability":0.6,"closedate":"2026-02-28"},{"name":"Third & Grove - Drupal Lead","amount":31200,"stage":"Hypothetical","pipeline":"Digital Existing New","geo":"US","probability":0.01,"closedate":"2026-03-20"},{"name":"Primacy - Drupal Extension","amount":29700,"stage":"Hypothetical","pipeline":"Digital Existing Expand","geo":"US","probability":0.01,"closedate":"2026-01-09"},{"name":"Sangfor CDM Retainer","amount":27000,"stage":"Potential","pipeline":"Digital Existing Expand","geo":"ROW","probability":0.2,"closedate":"2026-01-31"},{"name":"GLT Annual Support Ext 8","amount":26400,"stage":"Qualified To Buy","pipeline":"Digital Existing Expand","geo":"UK","probability":0.4,"closedate":"2026-04-30"},{"name":"Acquia FY Q2 Blanket","amount":26385,"stage":"Proposal Sent","pipeline":"Digital Existing Expand","geo":"US","probability":0.6,"closedate":"2025-09-30"},{"name":"AV - Swept Bidding Calculator","amount":20000,"stage":"Potential","pipeline":"Digital Existing New","geo":"US","probability":0.2,"closedate":"2025-09-30"},{"name":"Talent Studios - AI Recruitment","amount":20000,"stage":"Proposal Sent","pipeline":"Digital Net New","geo":"ROW","probability":0.6,"closedate":"2026-03-16"},{"name":"County of Riverside - ADA","amount":20000,"stage":"Potential","pipeline":"Digital Existing New","geo":"US","probability":0.2,"closedate":"2025-11-30"},{"name":"AV - Squarespace Analytics","amount":20000,"stage":"Potential","pipeline":"Digital Existing New","geo":"US","probability":0.2,"closedate":"2025-09-30"},{"name":"Kohler Sanijura CDM","amount":18150,"stage":"Qualified To Buy","pipeline":"Digital Existing Expand","geo":"US","probability":0.4,"closedate":"2025-09-30"},{"name":"East-West Center Support","amount":18000,"stage":"Decision Maker Bought-In","pipeline":"Digital Existing Expand","geo":"US","probability":0.8,"closedate":"2026-03-31"},{"name":"Altman/CDM Extension","amount":16572,"stage":"Potential","pipeline":"Digital Existing Expand","geo":"US","probability":0.2,"closedate":"2026-04-01"},{"name":"Altman RE - Feature dev Phase 2","amount":15000,"stage":"Potential","pipeline":"Digital Existing Expand","geo":"US","probability":0.2,"closedate":"2026-02-28"},{"name":"GLT AMTS - Quote Request","amount":12000,"stage":"Potential","pipeline":"Digital Existing Expand","geo":"UK","probability":0.2,"closedate":"2026-02-28"},{"name":"AV - Smart Panda Labs","amount":12000,"stage":"Hypothetical","pipeline":"Digital Existing New","geo":"US","probability":0.01,"closedate":"2026-04-01"},{"name":"Acquia FY Q1 Blanket","amount":11345,"stage":"Potential","pipeline":"Digital Existing Expand","geo":"US","probability":0.2,"closedate":"2025-12-31"},{"name":"Paragon DCX - DevOps","amount":10080,"stage":"Potential","pipeline":"Digital Existing New","geo":"UK","probability":0.2,"closedate":"2026-03-31"},{"name":"BCHT CD CR 1","amount":10000,"stage":"Potential","pipeline":"Digital Existing New","geo":"UK","probability":0.2,"closedate":"2025-07-30"},{"name":"Ironman - AI Chatbot v1.0","amount":10000,"stage":"Proposal Sent","pipeline":"Digital Existing New","geo":"US","probability":0.6,"closedate":"2026-03-31"},{"name":"Freshpet - Acquia DAM","amount":7000,"stage":"Hypothetical","pipeline":"Digital Net New","geo":"US","probability":0.01,"closedate":"2026-05-30"},{"name":"IRONMAN - Coach finder recovery","amount":6930,"stage":"Proposal Sent","pipeline":"Digital Existing Expand","geo":"US","probability":0.6,"closedate":"2026-03-31"},{"name":"Sangfor Content Population","amount":6720,"stage":"Potential","pipeline":"Digital Existing Expand","geo":"ROW","probability":0.2,"closedate":"2026-04-30"},{"name":"Ironman - HubSpot module fixes","amount":4682,"stage":"Proposal Sent","pipeline":"Digital Existing New","geo":"US","probability":0.6,"closedate":"2026-03-31"},{"name":"Franklin Madison CDM","amount":3600,"stage":"Potential","pipeline":"Digital Existing Expand","geo":"US","probability":0.2,"closedate":"2026-03-31"},{"name":"BEL USA - Audit","amount":3300,"stage":"Proposal Sent","pipeline":"Digital Net New","geo":"US","probability":0.6,"closedate":"2026-02-28"},{"name":"Enza Zaden - Marketing Hub","amount":1,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"ROW","probability":0.2,"closedate":"2025-10-18"},{"name":"AOPA - HubSpot platform","amount":1,"stage":"Hypothetical","pipeline":"Digital Net New","geo":"US","probability":0.01,"closedate":"2026-06-05"},{"name":"County of Riverside - AWS","amount":1,"stage":"Potential","pipeline":"Digital Existing Expand","geo":"US","probability":0.2,"closedate":"2026-02-27"},{"name":"Kohler - Acquia DAM/PIM","amount":1,"stage":"Hypothetical","pipeline":"Digital Existing Expand","geo":"US","probability":0.01,"closedate":"2025-09-30"},{"name":"Dental Corp - CMS replatforming","amount":1,"stage":"Hypothetical","pipeline":"Digital Net New","geo":"US","probability":0.01,"closedate":"2026-05-31"},{"name":"Kohler - 3D Asset Rendering","amount":1,"stage":"Hypothetical","pipeline":"Digital Existing New","geo":"US","probability":0.01,"closedate":"2025-09-30"},{"name":"Kohler - Re-platforming","amount":1,"stage":"Hypothetical","pipeline":"Digital Existing New","geo":"US","probability":0.01,"closedate":"2025-09-30"},{"name":"AV - GRT Mobile Dev","amount":1,"stage":"Qualified To Buy","pipeline":"Digital Existing New","geo":"US","probability":0.4,"closedate":"2025-09-30"},{"name":"Crush&Lovely - Partnership","amount":1,"stage":"Potential","pipeline":"Digital Net New","geo":"US","probability":0.2,"closedate":"2025-12-03"},{"name":"Australian DoD - AI File Transfer","amount":1,"stage":"Hypothetical","pipeline":"Digital Net New","geo":"ROW","probability":0.01,"closedate":"2025-12-31"},{"name":"Acquia CDM Support Staff-Aug","amount":1,"stage":"Decision Maker Bought-In","pipeline":"Digital Existing Expand","geo":"US","probability":0.8,"closedate":""},{"name":"Acquia Boehringer CR002","amount":1,"stage":"Decision Maker Bought-In","pipeline":"Digital Existing Expand","geo":"US","probability":0.8,"closedate":""},{"name":"Acquia VeoliaUK SOW","amount":1,"stage":"Decision Maker Bought-In","pipeline":"Digital Existing Expand","geo":"UK","probability":0.8,"closedate":""},{"name":"Nestle HPR","amount":1,"stage":"Decision Maker Bought-In","pipeline":"Digital Existing Expand","geo":"ROW","probability":0.8,"closedate":"2026-04-17"},{"name":"UEL Acquia DAM","amount":1,"stage":"Hypothetical","pipeline":"Digital Existing Expand","geo":"US","probability":0.01,"closedate":"2025-09-30"},{"name":"WRAP - Digital Services 2026","amount":1,"stage":"Qualified To Buy","pipeline":"Digital Existing New","geo":"UK","probability":0.4,"closedate":"2026-03-15"},{"name":"Raceforward WP to Drupal","amount":1,"stage":"Hypothetical","pipeline":"Digital Existing New","geo":"US","probability":0.01,"closedate":"2026-04-30"},{"name":"Everyone TV - Drupal","amount":1,"stage":"Potential","pipeline":"Digital Net New","geo":"UK","probability":0.2,"closedate":"2026-03-15"},{"name":"Enza Zaden - Marketing hub","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"ROW","probability":0.2,"closedate":"2026-01-29"},{"name":"Cast Iron HubSpot CRM","amount":0,"stage":"Out for Signature","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.9,"closedate":"2025-10-16"},{"name":"Ironman - Content Hub Enterprise","amount":0,"stage":"Business Considerations","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.3,"closedate":"2025-12-31"},{"name":"AOPA - HubSpot Sales pro","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.2,"closedate":"2026-05-31"},{"name":"Tecnologico de Monterrey","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"ROW","probability":0.2,"closedate":"2026-06-05"},{"name":"Mathspace Hub Implementation","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"ROW","probability":0.2,"closedate":"2026-05-28"},{"name":"Holloway Controls Hub","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.2,"closedate":"2026-06-07"},{"name":"Northwell Health Hub","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.2,"closedate":"2026-06-29"},{"name":"U-erre Talisis Hub","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"ROW","probability":0.2,"closedate":"2026-06-28"},{"name":"Tec Milenio Hub","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"ROW","probability":0.2,"closedate":"2026-06-14"},{"name":"BigHand Hub Expansion","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"UK","probability":0.2,"closedate":"2026-05-24"},{"name":"Smartlaunch Systems","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"ROW","probability":0.2,"closedate":"2026-06-22"},{"name":"Universidad Anahuac Hub","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"ROW","probability":0.2,"closedate":"2026-05-21"},{"name":"Acculevel Hub Expansion","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.2,"closedate":"2026-06-14"},{"name":"Kanaflex Platform Eval","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.2,"closedate":"2026-05-27"},{"name":"University of Guadalajara","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"ROW","probability":0.2,"closedate":"2026-05-31"},{"name":"Duke University Hub","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.2,"closedate":"2026-05-24"},{"name":"Take A Chef Hub","amount":0,"stage":"Solution Demo","pipeline":"HubSpot Shared Selling","geo":"ROW","probability":0.3,"closedate":"2026-05-14"},{"name":"Kedge Business School Hub","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"ROW","probability":0.2,"closedate":"2026-05-17"},{"name":"Texas A&M Hub","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.2,"closedate":"2026-05-24"},{"name":"Liberty University Hub","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.2,"closedate":"2026-06-18"},{"name":"Carleton University Hub","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"ROW","probability":0.2,"closedate":"2026-06-21"},{"name":"XPD Global Platform Eval","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"ROW","probability":0.2,"closedate":"2026-06-15"},{"name":"All County Property Mgmt","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.2,"closedate":"2026-06-28"},{"name":"University of Wisconsin","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.2,"closedate":"2026-05-10"},{"name":"Visa Property Mgmt Eval","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.2,"closedate":"2026-05-19"},{"name":"Hire Super Platform Eval","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.2,"closedate":"2026-06-18"},{"name":"UGA Platform Eval","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.2,"closedate":"2026-05-19"},{"name":"Sorrento Media Eval","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"US","probability":0.2,"closedate":"2026-06-22"},{"name":"Sangfor - Sales Hub","amount":0,"stage":"Discovery","pipeline":"HubSpot Shared Selling","geo":"ROW","probability":0.2,"closedate":"2026-06-29"}];
+
+const GC={US:"#3b82f6",UK:"#06b6d4",ROW:"#f59e0b"};
+const STAGES=["Discovery","Hypothetical","Potential","Qualified To Buy","Proposal Sent","Decision Maker Bought-In","Contract Sent"];
+const PTYPES=["All","Net New","Existing New","Existing Expand","HubSpot Shared"];
+
+function getCat(p){if(p.includes("Net New"))return"Net New";if(p.includes("Existing New"))return"Existing New";if(p.includes("Existing Expand"))return"Existing Expand";if(p.includes("HubSpot")||p.includes("Shared"))return"HubSpot Shared";return"Other"}
+function fmt(n){return n>=1e6?`$${(n/1e6).toFixed(1)}M`:n>=1e3?`$${(n/1e3).toFixed(0)}K`:`$${n.toFixed(0)}`}
+function fmtF(n){return"$"+n.toLocaleString("en-US",{maximumFractionDigits:0})}
+
+let currentFilter="All",sortCol="amount",sortDir="desc",searchTerm="",pieChart,barChart;
+
+function getFiltered(){
+  let d=DEALS;
+  if(currentFilter!=="All")d=d.filter(x=>getCat(x.pipeline)===currentFilter);
+  if(searchTerm)d=d.filter(x=>x.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  return d;
+}
+
+function calcStats(deals){
+  const s={total:{deals:deals.length,amount:0,weighted:0},byGeo:{US:{deals:0,amount:0,weighted:0},UK:{deals:0,amount:0,weighted:0},ROW:{deals:0,amount:0,weighted:0}}};
+  deals.forEach(d=>{s.total.amount+=d.amount;s.total.weighted+=d.amount*d.probability;s.byGeo[d.geo].deals++;s.byGeo[d.geo].amount+=d.amount;s.byGeo[d.geo].weighted+=d.amount*d.probability});
+  return s;
+}
+
+function renderFilters(){
+  const el=document.getElementById("filters");
+  el.innerHTML=PTYPES.map(t=>`<button class="${t===currentFilter?"active":""}" onclick="setFilter('${t}')">${t}</button>`).join("");
+}
+
+function renderKPIs(stats){
+  const el=document.getElementById("kpis");
+  const pct=(g)=>stats.total.amount>0?((stats.byGeo[g].amount/stats.total.amount)*100).toFixed(1):0;
+  el.innerHTML=`
+    <div class="kpi"><div class="kpi-label">Total Pipeline</div><div class="kpi-value">${fmt(stats.total.amount)}</div><div class="kpi-sub">${stats.total.deals} deals | Wtd: ${fmt(stats.total.weighted)}</div></div>
+    <div class="kpi us"><div class="kpi-label">US</div><div class="kpi-value">${fmt(stats.byGeo.US.amount)}</div><div class="kpi-sub">${stats.byGeo.US.deals} deals | ${pct("US")}%</div></div>
+    <div class="kpi uk"><div class="kpi-label">UK</div><div class="kpi-value">${fmt(stats.byGeo.UK.amount)}</div><div class="kpi-sub">${stats.byGeo.UK.deals} deals | ${pct("UK")}%</div></div>
+    <div class="kpi row"><div class="kpi-label">ROW</div><div class="kpi-value">${fmt(stats.byGeo.ROW.amount)}</div><div class="kpi-sub">${stats.byGeo.ROW.deals} deals | ${pct("ROW")}%</div></div>`;
+}
+
+function renderPie(stats){
+  const ctx=document.getElementById("pieChart").getContext("2d");
+  const data=["US","UK","ROW"].map(g=>stats.byGeo[g].amount);
+  if(pieChart)pieChart.destroy();
+  pieChart=new Chart(ctx,{type:"doughnut",data:{labels:["US","UK","ROW"],datasets:[{data,backgroundColor:[GC.US,GC.UK,GC.ROW],borderWidth:0}]},options:{responsive:true,plugins:{legend:{labels:{color:"#94a3b8",font:{size:12}}},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmtF(c.raw)} (${((c.raw/data.reduce((a,b)=>a+b,0))*100).toFixed(1)}%)`}}},cutout:"55%"}});
+}
+
+function renderBar(deals){
+  const ctx=document.getElementById("barChart").getContext("2d");
+  const cats=["Net New","Existing New","Existing Expand","HubSpot Shared"];
+  const us=[],uk=[],row=[];
+  cats.forEach(c=>{const f=deals.filter(d=>getCat(d.pipeline)===c);us.push(f.filter(d=>d.geo==="US").reduce((s,d)=>s+d.amount,0));uk.push(f.filter(d=>d.geo==="UK").reduce((s,d)=>s+d.amount,0));row.push(f.filter(d=>d.geo==="ROW").reduce((s,d)=>s+d.amount,0))});
+  if(barChart)barChart.destroy();
+  barChart=new Chart(ctx,{type:"bar",data:{labels:cats,datasets:[{label:"US",data:us,backgroundColor:GC.US},{label:"UK",data:uk,backgroundColor:GC.UK},{label:"ROW",data:row,backgroundColor:GC.ROW}]},options:{responsive:true,scales:{x:{stacked:true,ticks:{color:"#94a3b8",font:{size:11}},grid:{display:false}},y:{stacked:true,ticks:{color:"#94a3b8",font:{size:11},callback:v=>fmt(v)},grid:{color:"rgba(255,255,255,.05)"}}},plugins:{legend:{labels:{color:"#94a3b8",font:{size:12}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${fmtF(c.raw)}`}}}}});
+}
+
+function renderFunnel(deals){
+  const el=document.getElementById("funnel");
+  const stageData=STAGES.map(st=>{const sd=deals.filter(d=>d.stage===st);return{name:st,total:sd.reduce((s,d)=>s+d.amount,0),count:sd.length,us:sd.filter(d=>d.geo==="US").reduce((s,d)=>s+d.amount,0),uk:sd.filter(d=>d.geo==="UK").reduce((s,d)=>s+d.amount,0),row:sd.filter(d=>d.geo==="ROW").reduce((s,d)=>s+d.amount,0)}}).filter(x=>x.count>0);
+  const max=Math.max(...stageData.map(s=>s.total),1);
+  el.innerHTML=stageData.map(s=>{
+    const w=Math.max((s.total/max)*100,8);const t=s.total||1;
+    return`<div class="funnel-row"><div class="funnel-label">${s.name}</div><div style="flex:1"><div class="funnel-bar" style="width:${w}%">${s.us>0?`<div style="width:${(s.us/t)*100}%;background:${GC.US};height:100%"></div>`:""}${s.uk>0?`<div style="width:${(s.uk/t)*100}%;background:${GC.UK};height:100%"></div>`:""}${s.row>0?`<div style="width:${(s.row/t)*100}%;background:${GC.ROW};height:100%"></div>`:""}</div></div><div class="funnel-val">${fmt(s.total)} (${s.count})</div></div>`;
+  }).join("");
+}
+
+function renderTable(deals){
+  const sorted=[...deals].sort((a,b)=>{let va=a[sortCol],vb=b[sortCol];if(typeof va==="string"){va=va.toLowerCase();vb=vb.toLowerCase()}return sortDir==="asc"?(va<vb?-1:va>vb?1:0):(va>vb?-1:va<vb?1:0)});
+  const cols=[["name","Deal","left"],["amount","Amount","right"],["stage","Stage","left"],["pipeline","Pipeline","left"],["geo","Geo","left"],["probability","Prob","right"],["closedate","Close","left"]];
+  const si=(c)=>sortCol===c?(sortDir==="asc"?"↑":"↓"):"⇕";
+  const sic=(c)=>sortCol===c?"active":"";
+  document.getElementById("tableHead").innerHTML=cols.map(([c,l,a])=>`<th class="${a==="right"?"right":""}" onclick="setSort('${c}')">${l} <span class="sort-icon ${sic(c)}">${si(c)}</span></th>`).join("");
+  document.getElementById("tableTitle").textContent=`DEAL TABLE (${sorted.length} deals)`;
+  const show=sorted.slice(0,50);
+  document.getElementById("tableBody").innerHTML=show.map((d,i)=>{
+    const probColor=d.probability>=.8?"#22c55e":d.probability>=.4?"#eab308":"#ef4444";
+    return`<tr><td class="deal-name">${d.name}</td><td class="amount">${d.amount>1?fmtF(d.amount):"-"}</td><td style="color:#cbd5e1">${d.stage}</td><td><span class="pipe-badge">${getCat(d.pipeline)}</span></td><td><span class="geo-badge ${d.geo.toLowerCase()}">${d.geo}</span></td><td><div class="prob-bar"><div class="prob-track"><div class="prob-fill" style="width:${d.probability*100}%;background:${probColor}"></div></div><span class="prob-text">${(d.probability*100).toFixed(0)}%</span></div></td><td style="color:#94a3b8;font-size:12px">${d.closedate||"-"}</td></tr>`;
+  }).join("");
+  const sm=document.getElementById("showMore");
+  if(sorted.length>50){sm.textContent=`Showing 50 of ${sorted.length} deals`;sm.style.display="block"}else{sm.style.display="none"}
+}
+
+function render(){
+  const deals=getFiltered();const stats=calcStats(deals);
+  renderFilters();renderKPIs(stats);renderPie(stats);renderBar(deals);renderFunnel(deals);renderTable(deals);
+}
+
+window.setFilter=function(f){currentFilter=f;render()};
+window.setSort=function(c){if(sortCol===c)sortDir=sortDir==="asc"?"desc":"asc";else{sortCol=c;sortDir="desc"}render()};
+document.getElementById("search").addEventListener("input",e=>{searchTerm=e.target.value;render()});
+
+render();
+</script>
+</body>
+</html>
